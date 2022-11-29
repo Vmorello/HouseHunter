@@ -4,7 +4,7 @@ import ast
 from datetime import datetime
 from pprint import pprint
 
-from .rental import Rentals
+from .rental import RentalSearch
 
 
 def findLastest(source="archive/"):
@@ -41,6 +41,6 @@ def loadJsonFile(jsonFile):
     with open(jsonFile) as f:
         for line in f:
             rentalList = ast.literal_eval(line)
-    rentals = Rentals(rentalList)
+    rentals = RentalSearch(rentalList)
     #pprint(rentalList)
     return rentals

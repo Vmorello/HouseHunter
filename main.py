@@ -1,9 +1,17 @@
-from src.rental import Rentals
+import time
+
+from src.rental import RentalSearch, Rental, findNewestRentals
 from src.folder_util import findLastest, loadJsonFile
+
+from datetime import datetime
+from pprint import pprint
 
 
 def scrapeDaft(location="dublin-city"):
-    newRentals = Rentals()
+
+    newRentals = RentalSearch()
+
+    #pprint(newRentals.fullList)
     newRentals.getRentalsDaft(
         #"https://www.daft.ie/property-for-rent/dun-laoghaire-dublin?sort=publishDateDesc"
         f"https://www.daft.ie/property-for-rent/{location}?sort=publishDateDesc"
@@ -18,7 +26,32 @@ def scrapeDaft(location="dublin-city"):
 
 if __name__ == "__main__":
 
-    lastestFile = findLastest()
-    olderRentals = loadJsonFile("archive/" + lastestFile)
+    while (True):
+        print(f"------ starting a run at {datetime.now()}")
+        lastestFile = findLastest()
+        olderRentals = loadJsonFile("archive/" + lastestFile)
 
-    newRental = scrapeDaft()
+        newRental = scrapeDaft()
+
+        unprocessedRentals = findNewestRentals(olderRentals, newRental)
+
+        # unprocessedRentals = [{
+        #     'address':
+        #     'Gardiner Place, Dublin 1',
+        #     'bedrooms':
+        #     '2',
+        #     'price':
+        #     1950,
+        #     'url':
+        #     'https://www.daft.ie/for-rent/apartment-gardiner-place-dublin-1/4527116'
+        # }]
+
+        # pprint(newRental.fullList)
+
+        for newRental in unprocessedRentals:
+            rental = Rental(newRental)
+            rental.getDetailedInfo()
+            pprint(rental.toDict())
+            # rental.sendEmail()
+
+        time.sleep(600)
