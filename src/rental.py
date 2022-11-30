@@ -6,7 +6,7 @@ from pprint import pprint
 from datetime import datetime
 from bs4 import BeautifulSoup
 
-from splinter import Browser
+# from splinter import Browser
 
 
 class RentalSearch:
@@ -164,7 +164,7 @@ class Rental:
 
     def getPostalNumber(self):
         try:
-            postalNumber = re.findall("Dublin \d+", self.address)[0]
+            postalNumber = re.findall(r"Dublin \d+", self.address)[0]
             postalNumber = postalNumber.split(" ")[1]
             self.postalNumber = int(postalNumber)
         except Exception:
@@ -180,7 +180,7 @@ class Rental:
             "bedrooms": self.bedrooms,
             "furnished": self.furnished,
             "facilities": self.facility,
-            "Send email": self.sendEmail,
+            "Send email": self.sendEmailFlag,
         }
 
     def makeDecision(self):
@@ -190,14 +190,14 @@ class Rental:
         if self.postalNumber in [2, 8, 6, 4]:
             basePrice += 100
         if basePrice >= self.price:
-            self.sendEmail = True
+            self.sendEmailFlag = True
         else:
-            self.sendEmail = False
+            self.sendEmailFlag = False
 
-    def sendEmail(self):
-        browser = Browser('firefox')
-        browser.visit('http://google.com')
-        pass
+    # def sendEmail(self):
+    #     browser = Browser('firefox')
+    #     browser.visit('http://google.com')
+    #     pass
 
 
 ##===== utils functions=====
