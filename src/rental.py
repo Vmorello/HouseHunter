@@ -5,8 +5,7 @@ import json
 from pprint import pprint
 from datetime import datetime
 from bs4 import BeautifulSoup
-
-# from splinter import Browser
+from splinter import Browser
 
 
 class RentalSearch:
@@ -194,10 +193,10 @@ class Rental:
         else:
             self.sendEmailFlag = False
 
-    # def sendEmail(self):
-    #     browser = Browser('firefox')
-    #     browser.visit('http://google.com')
-    #     pass
+    def sendEmail(self):
+        browser = Browser('firefox')
+        browser.visit('http://google.com')
+        pass
 
 
 ##===== utils functions=====
