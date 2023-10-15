@@ -1,57 +1,65 @@
 import time
+import requests
 
-from src.rental import RentalSearch, Rental, findNewestRentals
+from src.rental import *
 from src.folder_util import findLastest, loadJsonFile
+
 
 from datetime import datetime
 from pprint import pprint
 
 
-def scrapeDaft(location="dublin-city"):
+url = "https://api.green-api.com/waInstance7103860888/sendMessage/1ac3fe52fbd747e4b38cabff2c1f84fe9e59ced3620b40dcb3"
+chatId = "120363181599538393@g.us"
 
-    newRentals = RentalSearch()
 
-    #pprint(newRentals.fullList)
-    newRentals.getRentalsDaft(
-        #"https://www.daft.ie/property-for-rent/dun-laoghaire-dublin?sort=publishDateDesc"
-        f"https://www.daft.ie/property-for-rent/{location}?sort=publishDateDesc"
-        # "https://www.daft.ie/property-for-rent/dublin-city"
-        #"https://www.daft.ie/property-for-rent/south-dublin-city-dublin"
-    )
-    newRentals.saveJson(location)
+def scrapeDublinDaft():
 
-    # print(newRentals)
-    return newRentals
+    search_results = RentalSearch()
+
+    postal_code_disired = [1,2,4,6,7,8]
+    for postal_code in postal_code_disired:
+        search_results.getRentalsDaftDublinPostal(postal_code)
+
+    # pprint(search_results.report)
+    
+    return search_results
+
 
 
 if __name__ == "__main__":
+    try: 
+        # startLoop()
+        headers = { 'Content-Type': 'application/json'}
 
-    while (True):
-        print(f"------ starting a run at {datetime.now()}")
-        lastestFile = findLastest()
-        olderRentals = loadJsonFile("archive/" + lastestFile)
+        master_rental_reporter = scrapeDublinDaft()
 
-        newRental = scrapeDaft()
+        while (True):
+            print(f"-------- starting a run at {datetime.now()} ---------")
 
-        unprocessedRentals = findNewestRentals(olderRentals, newRental)
+            newRentals = scrapeDublinDaft()
 
-        # unprocessedRentals = [{
-        #     'address':
-        #     'Gardiner Place, Dublin 1',
-        #     'bedrooms':
-        #     '2',
-        #     'price':
-        #     1950,
-        #     'url':
-        #     'https://www.daft.ie/for-rent/apartment-gardiner-place-dublin-1/4527116'
-        # }]
+            unprocessedRentals = find_delta_rentals(master_rental_reporter.report, newRentals.report)
 
-        # pprint(newRental.fullList)
+            master_rental_reporter.append_unproccesed(unprocessedRentals)
 
-        for newRental in unprocessedRentals:
-            rental = Rental(newRental)
-            rental.getDetailedInfo()
-            pprint(rental.toDict())
-            # rental.sendEmail()
+            post_processed_rentals = []
+            for newRental in unprocessedRentals:
+                rental = Rental(newRental)
+                rental.getDetailedInfo()
+                post_processed_rentals.append(rental.toStr())
+                # pprint(rental.toDict())
+            
+            if post_processed_rentals:
+                text_message = " ".join(post_processed_rentals)
+                print(text_message)
+                payload = f"""{{\r\n\t"chatId": "{chatId}",\r\n\t"message": "{text_message}"\r\n}}"""
+                response = requests.request("POST", url, headers=headers, data = payload)
+                # print(response.text.encode('utf8'))
 
-        time.sleep(600)
+            time.sleep(300)
+    except BaseException:
+        print('Interrupted & printing report')
+        print(f"we found {len(master_rental_reporter.report)-120} rentals")
+        master_rental_reporter.saveJson("dublin_center")
+

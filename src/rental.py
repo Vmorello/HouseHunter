@@ -1,3 +1,4 @@
+import os
 import requests
 import re
 import json
@@ -5,7 +6,8 @@ import json
 from pprint import pprint
 from datetime import datetime
 from bs4 import BeautifulSoup
-from splinter import Browser
+
+from .html_util import *
 
 
 class RentalSearch:
@@ -17,28 +19,19 @@ class RentalSearch:
         #print(self.allRentals)
 
     @property
-    def fullList(self):
+    def report(self):
         return self.allRentals
+    
+
 
     @property
     def URLs(self):
         return [rental["url"] for rental in self.allRentals]
+    
+    def reportOnPostal(self, postal):
+        return [rental for rental in self.report if rental["postal_code"] == postal]
 
-    # def __str__(self) -> str:
-    #     full_str = ''
-    #     for rental in self.allRentals:
-    #         full_str = full_str + str(rental)
-    #     return full_str
-
-    def saveJson(self, location):
-        # rentalCollection = []
-        # for rental in self.allRentals:
-        #     rentalCollection.append(rental.toJson())
-        with open(f'archive/{location}|{datetime.utcnow()}.json',
-                  'w') as json_file:
-            json.dump(self.allRentals, json_file)
-
-    def getRentalsDaft(self, daftUrl):
+    def getRentalsDaft(self, daftUrl, postal_code="NA") -> None:
         daftWebsite = requests.get(daftUrl, timeout=10)
 
         rentalSearchPage = BeautifulSoup(daftWebsite.text, "html5lib")
@@ -48,72 +41,47 @@ class RentalSearch:
 
         linksInPage = rentalSearchPage.find_all(href=findRentalListings)
 
+
+
         for rentalHTML in linksInPage:
 
             # print(rentalHTML.prettify())
             try:
-                price = self.getPrice(rentalHTML)
-                url = self.getUrl(rentalHTML)
-                bedrooms = self.getBedrooms(rentalHTML)
-                address = self.getAddress(url)
+                price = getPrice(rentalHTML)
+                url = getUrl(rentalHTML)
+                bedrooms = getBedrooms(rentalHTML)
+                address = getAddress(url)
 
                 rental = {
                     "url": url,
                     "address": address,
                     "price": price,
                     "bedrooms": bedrooms,
+                    "postal_code":postal_code,
+                    "first_detected": str(datetime.utcnow())
+
                 }
                 self.allRentals.append(rental)
             except IndexError as e:
                 pass
 
-    def getPrice(self, rentalHTML) -> int:
-        try:
-            priceHTML = rentalHTML.find(
-                'span',
-                {"class": "TitleBlock__StyledSpan-sc-1avkvav-5 fKAzIL"})
-            # pprint(priceHTML)
-            price = priceHTML.text
-        except AttributeError:
-            priceHTML = rentalHTML.find(
-                'p', {"class": "SubUnit__Title-sc-10x486s-5 feGTKf"})
-            # pprint(priceHTML)
-            price = priceHTML.text
+    def getRentalsDaftDublinPostal(self, postal_code:int)-> None:
+        self.getRentalsDaft(f"https://www.daft.ie/property-for-rent/dublin-{postal_code}-dublin?sort=publishDateDesc", postal_code)
 
-        costWithComma = re.findall(r'[0-9],[0-9]+|[0-9]+', price)
-        cost = re.sub(r',', '', costWithComma[0])
-        cost = int(cost)
+    def append_unproccesed(self, report:list)->None:
+        for rental in report:
+            self.allRentals.append(rental)
 
-        return cost
+    
+    def saveJson(self, name):
+        print("going to save a json")
+        if (not os.path.exists("archive/")):
+            print("making archive folder")
+            os.mkdir("archive/")
 
-    def getUrl(self, rentalHTML) -> str:
+        with open(f'archive/{name}_{datetime.utcnow()}.json',mode='w') as json_file:
+            json.dump(self.allRentals, json_file)
 
-        endingURL = rentalHTML.get("href")
-        fullURL = "https://www.daft.ie" + endingURL
-        return fullURL
-
-    def getBedrooms(self, rentalHTML) -> int:
-        try:
-            bedHTML = rentalHTML.find('p', {"data-testid": "beds"})
-            beds = re.findall(r'[0-9]', bedHTML.text)
-            beds = beds[0]
-        except AttributeError:
-            try:
-                bedHTML = rentalHTML.find(
-                    'div',
-                    {"class": "SubUnit__CardInfoItem-sc-10x486s-7 YYbRy"})
-                beds = re.findall(r'[0-9]', bedHTML.text)
-                beds = beds[0]
-            except AttributeError:
-                beds = "Probably studio"
-        return beds
-
-    def getAddress(self, url) -> int:
-        address = url.split("/")[4]
-        address = re.sub(r'apartment|house|studio', '', address)
-        address = re.sub(r'-', ' ', address)
-
-        return address
 
 
 class Rental:
@@ -123,6 +91,8 @@ class Rental:
         self.address = input["address"]
         self.price = input["price"]
         self.bedrooms = input["bedrooms"]
+        self.postal_code = input["postal_code"]
+
 
     def getDetailedInfo(self):
         daftWebsite = requests.get(self.url)
@@ -131,10 +101,6 @@ class Rental:
 
         self.scrapingFacilities(singlePageHtml)
         self.scrapingOverview(singlePageHtml)
-        self.getPostalNumber()
-        self.makeDecision()
-
-        # print(singlePageHtml.prettify())
 
     def scrapingFacilities(self, singlePageHtml):
         self.facility = []
@@ -161,47 +127,32 @@ class Rental:
             if detail.startswith("Furnished:"):
                 self.furnished = detail.split(":")[1]
 
-    def getPostalNumber(self):
-        try:
-            postalNumber = re.findall(r"Dublin \d+", self.address)[0]
-            postalNumber = postalNumber.split(" ")[1]
-            self.postalNumber = int(postalNumber)
-        except Exception:
-            self.postalNumber = "unknown"
-
     def toDict(self):
         return {
             "url": self.url,
             "address": self.address,
             "price": self.price,
             "available from": self.availableFrom,
-            "postal": self.postalNumber,
+            "postal": self.postal_code,
             "bedrooms": self.bedrooms,
             "furnished": self.furnished,
             "facilities": self.facility,
-            "Send email": self.sendEmailFlag,
         }
+    
+    def toStr(self):
+        return f"{self.price} - {self.url}"
 
-    def makeDecision(self):
-        basePrice = 2000
-        if "Dishwasher" in self.facility:
-            basePrice += 100
-        if self.postalNumber in [2, 8, 6, 4]:
-            basePrice += 100
-        if basePrice >= self.price:
-            self.sendEmailFlag = True
-        else:
-            self.sendEmailFlag = False
-
-    def sendEmail(self):
-        browser = Browser('firefox')
-        browser.visit('http://google.com')
-        pass
+    def toText(self):
+        return f"\
+         D{self.postal_code}  beds:{self.bedrooms}\n\
+         ${self.price}  DW?{'Dishwasher' in self.furnished}\n\
+        {self.url}\
+    "
 
 
 ##===== utils functions=====
-def findNewestRentals(olderRentalSeach, newerRentals):
-    lastCheckedEntryURLs = olderRentalSeach.URLs
+def findNewestRentals(master_rental_reporter, newerRentals):
+    lastCheckedEntryURLs = master_rental_reporter.URLs
 
     unprocessedRentals = []
     for item in newerRentals.fullList:
@@ -211,3 +162,10 @@ def findNewestRentals(olderRentalSeach, newerRentals):
 
     return unprocessedRentals
     pprint(unprocessedRentals)
+
+def find_delta_rentals(master_rental_report:list, new_rentals_report:list) -> list:
+
+    processed_urls =[rental["url"] for rental in master_rental_report ]
+    unprocessed_rentals =[new_rental for new_rental in new_rentals_report if new_rental["url"] not in processed_urls]
+
+    return unprocessed_rentals

@@ -7,7 +7,7 @@ from pprint import pprint
 from .rental import RentalSearch
 
 
-def findLastest(source="archive/"):
+def findLastest(location, source="archive/" ):
 
     latestDate = datetime.strptime('2011-01-21 01:01:01', '%Y-%m-%d %H:%M:%S')
     latestFilename = ""
@@ -27,9 +27,9 @@ def findLastest(source="archive/"):
     return latestFilename
 
 
-def extractDateFromFileName(file):
+def extractDateFromFileName(file:str):
     try:
-        date = file.split("|")[1]
+        date = file.split("_")[1]
         date = date.split(".")[0]
     except IndexError:
         #print("non-dated itemed")
@@ -38,7 +38,7 @@ def extractDateFromFileName(file):
 
 
 def loadJsonFile(jsonFile):
-    with open(jsonFile) as f:
+    with open(jsonFile, "r") as f:
         for line in f:
             rentalList = ast.literal_eval(line)
     rentals = RentalSearch(rentalList)
